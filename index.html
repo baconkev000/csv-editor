@@ -180,10 +180,13 @@
 
             // Display the specific row
             const row = document.createElement('tr');
-            csvData[rowIndex].forEach((cell) => {
+            
+            csvData[rowIndex].forEach((cell, index) => {
                 const td = document.createElement('td');
                 td.textContent = cell; // Display cell content without quotes
-                td.contentEditable = 'true'; // Make the cell editable
+                if(index == 2){
+                    td.contentEditable = 'true'; // Make the cell editable
+                }
                 row.appendChild(td);
             });
             table.appendChild(row);
