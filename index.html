@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editable CSV Table (One Row at a Time)</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        td[contenteditable] {
+            background-color: #cbe1f5;
+        }
+        button {
+            margin-right: 10px;
+            padding:10px;
+            background-color: #cbe1f5;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+        button:hover{
+            background-color: #b8d0e6;
+        }
+        .wrapper {
+            width: 90%;
+            margin-left: 5%;
+        }
+        .table-wrapper {
+            min-height: 300px;
+            padding-top: 5px;
+            padding-bottom: 5px;
+            margin-top: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .row-info {
+            margin-top: 10px;
+        }
+        #search-bar {
+            margin-bottom: 20px;
+        }
+        .file-wrap {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+        }
+        input{
+            padding: 7px;
+            width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <h1>Edit CSV File - One Row at a Time</h1>
+        <div class="file-wrap">
+        <!-- File Input -->
+        <input type="file" id="fileInput" accept=".csv">
+
+        <!-- Search Bar -->
+        <div id="search-bar">
+            <input type="number" id="rowSearch" placeholder="Enter row number" min="1">
+            <button id="searchButton">Search</button>
+        </div>
+    </div>
+        
+        <div class="table-wrapper">
+            <!-- Table for displaying CSV content -->
+            <table id="csvTable"></table>
+        </div>
+        
+        <!-- Buttons to navigate through the rows -->
+        <button id="prevButton" disabled>Previous</button>
+        <button id="nextButton" disabled>Next</button>
+        
+        <!-- Button to download the updated CSV -->
+        <button id="saveButton">Save CSV</button>
+        <br />
+                
+        <!-- Row Info Display -->
+        <div class="row-info" id="rowInfo"></div>
+    </div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect, false);
+        document.getElementById('prevButton').addEventListener('click', showPreviousRow, false);
+        document.getElementById('nextButton').addEventListener('click', showNextRow, false);
+        document.getElementById('saveButton').addEventListener('click', saveCSV, false);
+        document.getElementById('searchButton').addEventListener('click', searchRow, false);
+
+        // Add event listener for Enter key
+        document.getElementById('rowSearch').addEventListener('keypress', function(event) {
+            if (event.key === 'Enter') { // Check if the pressed key is Enter
+                searchRow(); // Call the search function
+            }
+        });
+
+        let csvData = [];
+        let currentRow = 1; // To track the current row
+
+        // Load the last uploaded file and the last row number from localStorage
+        window.onload = function() {
+            toggleButtonVisibility(false);
+            const lastRow = localStorage.getItem('lastRow');
+            if (lastRow && lastRow != 1) {
+                alert("You were last on row " + lastRow);
+            }
+        };
+
+        // Handle the file selection
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const contents = e.target.result;
+                    csvData = parseCSV(contents);
+                    currentRow = 1; // Reset to the first row
+                    displayRow(currentRow);
+                    updateNavigationButtons();
+                    updateRowInfo();
+                    toggleButtonVisibility(true);
+                };
+                reader.readAsText(file);
+            }else{
+                toggleButtonVisibility(false);
+            }
+        }
+
+        // Function to toggle the display of buttons
+        function toggleButtonVisibility(isVisible) {
+            const buttons = ['prevButton', 'nextButton', 'saveButton', 'search-bar'];
+            buttons.forEach(buttonId => {
+                const button = document.getElementById(buttonId);
+                button.style.display = isVisible ? 'inline-block' : 'none'; // Show or hide buttons
+            });
+        }
+
+        // Parse CSV file content into an array of arrays (rows and columns)
+        function parseCSV(data) {
+            const rows = data.trim().split('\n').map(row => {
+                const regex = /(?:,|\n|^)(?:"([^"]*)"|([^",]*))/g; // Updated regex to handle quotes correctly
+                let matches;
+                const result = [];
+                while ((matches = regex.exec(row)) !== null) {
+                    const cell = matches[1] ? matches[1] : matches[2];
+                    result.push(cell);
+                }
+                return result;
+            });
+            return rows;
+        }
+
+        // Display only one row in the table
+        function displayRow(rowIndex) {
+            const table = document.getElementById('csvTable');
+            table.innerHTML = ''; // Clear previous table
+
+            // Create table header
+            const headerRow = document.createElement('tr');
+            ['id', 'user', 'assistant'].forEach(header => {
+                const th = document.createElement('th');
+                th.textContent = header;
+                headerRow.appendChild(th);
+            });
+            table.appendChild(headerRow);
+
+            // Display the specific row
+            const row = document.createElement('tr');
+            csvData[rowIndex].forEach((cell) => {
+                const td = document.createElement('td');
+                td.textContent = cell; // Display cell content without quotes
+                td.contentEditable = 'true'; // Make the cell editable
+                row.appendChild(td);
+            });
+            table.appendChild(row);
+        }
+
+        // Update the CSV data array with the edited content
+        function updateCSVData(rowIndex) {
+            const tableRow = document.querySelectorAll('#csvTable tr')[1]; // The current row being displayed
+            const cells = Array.from(tableRow.querySelectorAll('td'));
+            const updatedRow = cells.map(cell => cell.textContent.replace(/"/g, '""')); // Escape quotes inside cells
+            csvData[rowIndex] = updatedRow; // Update the row in csvData
+        }
+
+        // Show the next row
+        function showNextRow() {
+            updateCSVData(currentRow);
+            currentRow++;
+            displayRow(currentRow);
+            updateNavigationButtons();
+            updateRowInfo();
+        }
+
+        // Show the previous row
+        function showPreviousRow() {
+            updateCSVData(currentRow);
+            currentRow--;
+            displayRow(currentRow);
+            updateNavigationButtons();
+            updateRowInfo();
+        }
+
+        // Search for a row by its number
+        function searchRow() {
+            const rowNumber = parseInt(document.getElementById('rowSearch').value, 10);
+            if (rowNumber >= 1 && rowNumber < csvData.length) {
+                updateCSVData(currentRow); // Save current row before changing
+                currentRow = rowNumber; // Update current row to the searched row
+                displayRow(currentRow);
+                updateNavigationButtons();
+                updateRowInfo();
+            } else {
+                alert('Invalid row number. Please enter a valid row number.');
+            }
+        }
+
+        // Update the row information display
+        function updateRowInfo() {
+            localStorage.setItem('lastRow', currentRow);
+            const rowInfo = document.getElementById('rowInfo');
+            rowInfo.textContent = `Row: ${currentRow} of ${csvData.length - 1}`; // Subtract 1 for the header row
+        }
+
+        // Enable/disable navigation buttons based on the current row
+        function updateNavigationButtons() {
+            document.getElementById('prevButton').disabled = currentRow === 1;
+            document.getElementById('nextButton').disabled = currentRow === csvData.length - 1;
+        }
+
+    // Save the CSV file with changes
+    function saveCSV() {
+        updateCSVData(currentRow); // Save current row before downloading
+        if (csvData.length === 0 || currentRow >= csvData.length) {
+            console.error('No valid data to save.');
+            return;
+        }
+
+        const rows = csvData.map(row => {
+            // Check if the row is defined and is an array
+            if (Array.isArray(row)) {
+                return row.map(cell => `"${cell ? cell.replace(/"/g, '""') : ''}"`).join(','); // Handle undefined cell
+            }
+            return ''; // Return empty string for undefined rows
+        }).join('\n'); // Join all rows with newline
+
+        // Create a downloadable link with the new CSV content
+        const blob = new Blob([rows], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = url;
+        downloadLink.download = 'updated_file.csv';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+        URL.revokeObjectURL(url); // Clean up the URL object
+    }
+
+    </script>
+</body>
+</html>
